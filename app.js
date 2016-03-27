@@ -2,6 +2,7 @@ Todos = new Mongo.Collection('todos');
 
 if (Meteor.isClient) {
  //template heppers
+Meteor.subscribe('todos');
 
  Template.main.helpers({
     todos: function (){
@@ -13,11 +14,7 @@ if (Meteor.isClient) {
     "submit .new-todo":function(event){
       var text = event.target.text.value;
 
-      Todos.insert({
-        text: text,
-        createdAt: new Date()
-      });
-
+     Meteor.call('addTodo',text);
       //Clear the form
 
       event.target.text.value='';
@@ -27,12 +24,10 @@ if (Meteor.isClient) {
       return false;
     },
     "click .toggle-checked":function(){
-      Todos.update(this._id,{$set:{checked: ! this.checked}});
+        Meteor.call('setChecked',this._id,!this.checked);
     },
     "click .delete-todo": function(){
-      if(confirm("Are you sure ?")){
-      Todos.remove(this._id);
-      }
+        Meteor.call('deleteTodo',this._id);
     }
  });
 
@@ -40,3 +35,45 @@ if (Meteor.isClient) {
     passwordSignupFields: "USERNAME_ONLY"
   });
 }
+
+if(Meteor.isServer){
+        Meteor.publish('todos',function() {
+            if(!this.userId){
+                return Todos.find();
+            }else{
+                return Todos.find({userId: this.userId});
+            }
+        });
+
+}
+
+Meteor.methods({
+    addTodo : function(text){
+        if(!Meteor.userId()){
+            throw new Meteor.Error('non-authorized');
+        }
+
+        Todos.insert({
+            text: text,
+            createdAt: new Date(),
+            username: Meteor.user().username
+        });
+    },
+    deleteTodo: function(todoId){
+        var todo = Todos.findOne(todoId);
+        if(todo.userId !== Meteor.userId() ){
+            throw new Meteor.Error('not-authorized');
+        }
+          Todos.remove(todoId);
+    },
+
+    setChecked : function(todoId, setChecked){
+        var todo = Todos.findOne(todoId);
+        if(todo.userId !== Meteor.userId() ){
+            throw new Meteor.Error('not-authorized');
+        }
+        Todos.update(todoId,{$set:{checked:setChecked}});
+    }
+});
+
+
